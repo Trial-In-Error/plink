@@ -1,12 +1,18 @@
 const { token } = require('./secrets.json')
 const queryString = require('query-string')
-// const queryString = require('querystring')
 const fetch = require('node-fetch')
-const baseUrl = 'https://api.pinboard.in/v1'
+const open = require('open')
+const url = require('url')
+const chalk = require('chalk')
+const figures = require("figures")
 const fuzzy = require('fuzzy')
+const path = require('path')
+
+const inquirer = require('inquirer')
+inquirer.registerPrompt('search-list', require('inquirer-search-list'))
+
 const low = require('lowdb')
 const FileAsync = require('lowdb/adapters/FileAsync')
-const path = require('path')
 const adapter = new FileAsync(path.resolve(__dirname, 'db.json'), { defaultValue: { posts: [], lastUpdate: undefined } })
 let db = low(adapter)
 
@@ -15,6 +21,7 @@ const makeQuery = (params) => {
 }
 
 const getPosts = async (config) => {
+  const baseUrl = 'https://api.pinboard.in/v1'
   const url = `${baseUrl}/posts/all?`
   return fetch(url + makeQuery({
     ...config,
@@ -57,12 +64,6 @@ const getPosts = async (config) => {
   await promptUser(posts)
 })()
 
-const inquirer = require('inquirer')
-const url = require('url')
-const chalk = require('chalk')
-const figures = require("figures")
-inquirer.registerPrompt('search-list', require('inquirer-search-list'))
-
 const renderRow = (item, isSelected) => {
   const post = item.value;
   if (isSelected) {
@@ -85,8 +86,7 @@ const filterRow = ({ value: post }, query) => {
   }
 }
 
-
-const promptUser = (db) => {
+const promptUser = async (db) => {
   return inquirer
     .prompt([{
       type: 'search-list',
@@ -99,7 +99,7 @@ const promptUser = (db) => {
       filterRow
     }])
     .then((answers) => {
-      console.log(JSON.stringify(answers, null, 2))
+      open(answers.link.href)
     })
     .catch((error) => console.log(error))
 }
