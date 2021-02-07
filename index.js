@@ -4,6 +4,11 @@ const queryString = require('query-string')
 const fetch = require('node-fetch')
 const baseUrl = 'https://api.pinboard.in/v1'
 const fuzzy = require('fuzzy')
+const low = require('lowdb')
+const FileAsync = require('lowdb/adapters/FileAsync')
+const path = require('path')
+const adapter = new FileAsync(path.resolve(__dirname, 'db.json'), { defaultValue: { posts: [], lastUpdate: undefined } })
+let db = low(adapter)
 
 const makeQuery = (params) => {
   return queryString.stringify(params, { encode: false })
@@ -18,10 +23,40 @@ const getPosts = async (config) => {
   })).then((res) => res.json())
 }
 
-// getPosts({ results: 3 }).then(console.log).catch(console.error)
-// getPosts().then((res) => console.log(JSON.stringify(res, null, 2))).catch(console.error)
+(async() => {
+  const promises = []
+  // ensure the promise to make the db has resolved
+  db = await db
 
-const db = require('./out.json')
+
+  // read what we need from the db
+  promises.push(db.get('lastUpdate').value())
+  promises.push(db.get('posts').value())
+  await Promise.all(promises)
+  let [lastUpdate, oldPosts] = promises
+
+
+  // then get new posts
+  const newPosts = await getPosts(lastUpdate ? { fromdt: lastUpdate } : {}) || []
+
+
+  // then write everything we need to the db
+  // this needs to be really fast, so we try to avoid writing to db as much as possible
+  const posts = [...oldPosts, ...newPosts]
+  const newLastUpdate = new Date(posts.map((post) => new Date(post.time).getTime()).sort().pop()).toISOString()
+  if (newPosts.length !== 0) {
+    promises.push(db.set('posts', posts).write())
+  }
+  if (lastUpdate !== newLastUpdate) {
+    promises.push(db.set('lastUpdate', lastUpdate).write())
+  }
+  await Promise.all(promises)
+
+
+  // then prompt the user for input
+  await promptUser(posts)
+})()
+
 const inquirer = require('inquirer')
 const url = require('url')
 const chalk = require('chalk')
@@ -37,7 +72,7 @@ const renderRow = (item, isSelected) => {
   }
 }
 
-const filterRow = ({ post }, query) => {
+const filterRow = ({ value: post }, query) => {
   const desiredTags = query.split(' ').filter((subQuery) => subQuery[0] === '+')
   const queryMinusTags = query.split(' ').filter((subQuery) => subQuery[0] !== '+').join('')
   const actualTags = post.tags.split(' ')
@@ -50,19 +85,21 @@ const filterRow = ({ post }, query) => {
   }
 }
 
-inquirer
-  .prompt([{
-    type: 'search-list',
-    message: 'Select a link',
-    name: 'link',
-    arbitrary: 'salsa',
-    // pageSize: 1,
-    // we just overwrite name anyway in renderRow, not sure why it exists...
-    choices: db.map((post) => { return { name: post.description, value: post } }),
-    renderRow,
-    filterRow
-  }])
-  .then((answers) => {
-    console.log(JSON.stringify(answers, null, 2))
-  })
-  .catch((error) => console.log(error))
+
+const promptUser = (db) => {
+  return inquirer
+    .prompt([{
+      type: 'search-list',
+      message: 'Select a link',
+      name: 'link',
+      // pageSize: 1,
+      // we just overwrite name anyway in renderRow, not sure why it exists...
+      choices: db.map((post) => { return { name: post.description, value: post } }),
+      renderRow,
+      filterRow
+    }])
+    .then((answers) => {
+      console.log(JSON.stringify(answers, null, 2))
+    })
+    .catch((error) => console.log(error))
+}
