@@ -5,7 +5,7 @@ const open = require('open')
 const url = require('url')
 const chalk = require('chalk')
 const figures = require("figures")
-const fuzzy = require('fuzzy')
+const Fuse = require('fuse.js')
 const path = require('path')
 
 const inquirer = require('inquirer')
@@ -73,14 +73,21 @@ const renderRow = (item, isSelected) => {
   }
 }
 
-const filterRow = ({ value: post }, query) => {
+const filterSet = (list, query) => {
+  list = list.filter((item) => filterOutUntagged(item, query))
+  let fuse = new Fuse(list, { keys: ['name'] })
+  return fuse.search(query).map((i) => i.item)
+}
+
+const filterOutUntagged = ({ value: post }, query) => {
   const desiredTags = query.split(' ').filter((subQuery) => subQuery[0] === '+')
   const queryMinusTags = query.split(' ').filter((subQuery) => subQuery[0] !== '+').join('')
   const actualTags = post.tags.split(' ')
   const validTags =
     desiredTags.every((desiredTag) => actualTags.some((actualTag) => fuzzy.test(desiredTag.slice(1), actualTag)))
   if (validTags) {
-    return fuzzy.test(queryMinusTags, `${post.description} ${url.parse(post.href).hostname}`)
+    return true
+    // fuzzy.test(queryMinusTags, `${post.description} ${url.parse(post.href).hostname}`)
   } else {
     return false
   }
@@ -96,7 +103,7 @@ const promptUser = async (db) => {
       // we just overwrite name anyway in renderRow, not sure why it exists...
       choices: db.map((post) => { return { name: post.description, value: post } }),
       renderRow,
-      filterRow
+      filterSet
     }])
     .then((answers) => {
       open(answers.link.href)
