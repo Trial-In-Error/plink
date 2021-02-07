@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const { token } = require('./secrets.json')
 const queryString = require('query-string')
 const fetch = require('node-fetch')
