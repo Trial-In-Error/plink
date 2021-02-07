@@ -6,8 +6,8 @@ const fetch = require('node-fetch')
 const open = require('open')
 const url = require('url')
 const chalk = require('chalk')
-const figures = require("figures")
-const Fuse = require('fuse.js')
+const figures = require('figures')
+const fuzzy = require('fuzzy')
 const path = require('path')
 
 const inquirer = require('inquirer')
@@ -76,20 +76,18 @@ const renderRow = (item, isSelected) => {
 }
 
 const filterSet = (list, query) => {
+  const queryMinusTags = query.split(' ').filter((subQuery) => subQuery[0] !== '+').join('')
   list = list.filter((item) => filterOutUntagged(item, query))
-  let fuse = new Fuse(list, { keys: ['name'] })
-  return fuse.search(query).map((i) => i.item)
+  return fuzzy.filter(queryMinusTags, list, { extract: (i) => i.name }).map((i) => i.original)
 }
 
 const filterOutUntagged = ({ value: post }, query) => {
   const desiredTags = query.split(' ').filter((subQuery) => subQuery[0] === '+')
-  const queryMinusTags = query.split(' ').filter((subQuery) => subQuery[0] !== '+').join('')
   const actualTags = post.tags.split(' ')
   const validTags =
     desiredTags.every((desiredTag) => actualTags.some((actualTag) => fuzzy.test(desiredTag.slice(1), actualTag)))
   if (validTags) {
     return true
-    // fuzzy.test(queryMinusTags, `${post.description} ${url.parse(post.href).hostname}`)
   } else {
     return false
   }
