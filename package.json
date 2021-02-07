@@ -2,7 +2,7 @@
   "name": "plink",
   "version": "1.0.0",
   "description": "plink is the sound of hitting your target with a pushpin",
-  "main": "index.js",
+  "main": "plink.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
