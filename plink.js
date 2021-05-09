@@ -57,7 +57,7 @@ const getPosts = async (config) => {
     promises.push(db.set('posts', posts).write())
   }
   if (lastUpdate !== newLastUpdate) {
-    promises.push(db.set('lastUpdate', lastUpdate).write())
+    promises.push(db.set('lastUpdate', newLastUpdate).write())
   }
   await Promise.all(promises)
 
